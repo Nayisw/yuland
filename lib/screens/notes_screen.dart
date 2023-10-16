@@ -1,10 +1,17 @@
+import 'dart:core';
+
 import 'package:flutter/material.dart';
-import 'package:yuland/models/note_model.dart';
 import 'package:intl/intl.dart';
+import 'package:yuland/models/note_model.dart';
+import 'package:yuland/screens/note_detail_screen.dart';
+// import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 
 class NotesScreen extends StatefulWidget {
   @override
   _NotesScreenState createState() => _NotesScreenState();
+  final String selectedCategory;
+
+  NotesScreen({required this.selectedCategory});
 }
 
 class _NotesScreenState extends State<NotesScreen>
@@ -12,7 +19,17 @@ class _NotesScreenState extends State<NotesScreen>
   int _selectedCategoryIndex = 0;
   late TabController _tabController;
   final DateFormat _dateFormatter = DateFormat('dd MMM');
-  final DateFormat _timeFormatter = DateFormat('h:mm');
+  // final DateFormat _timeFormatter = DateFormat('h:mm');
+  TextEditingController _noteTitleController = TextEditingController();
+  TextEditingController _noteContentController = TextEditingController();
+  List<Note> _notes = [];
+
+  final Map<String, int> categories = {
+    'Notes': 0,
+    'Work': 0,
+    'Home': 0,
+    'Complete': 0,
+  };
 
   @override
   void initState() {
@@ -81,6 +98,190 @@ class _NotesScreenState extends State<NotesScreen>
     );
   }
 
+  Widget _buildNoteCard(Note note) {
+    return Dismissible(
+      key: UniqueKey(),
+      background: Container(
+        color: Colors.red,
+        alignment: Alignment.centerLeft,
+        padding: EdgeInsets.only(left: 20.0),
+        child: Icon(
+          Icons.delete,
+          color: Colors.white,
+        ),
+      ),
+      secondaryBackground: Container(
+        color: Colors.blue,
+        alignment: Alignment.centerRight,
+        padding: EdgeInsets.only(right: 20.0),
+        child: Icon(
+          Icons.edit,
+          color: Colors.white,
+        ),
+      ),
+      onDismissed: (direction) {
+        if (direction == DismissDirection.startToEnd) {
+          // Delete the note when swiped from start to end
+          _deleteNote(note);
+        } else if (direction == DismissDirection.endToStart) {
+          // Edit the note when swiped from end to start
+          _viewOrEditNote(note);
+        }
+      },
+      child: Container(
+        width: MediaQuery.of(context).size.width /
+            2, // Customize the width as needed
+        child: Card(
+          margin: EdgeInsets.all(10.0), // Adjust margins as needed
+          elevation: 2, // Add elevation for a shadow effect
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8.0), // Add rounded corners
+          ),
+          child: Container(
+            padding: EdgeInsets.all(12.0),
+            decoration: BoxDecoration(
+              color: Colors.white, // Set the card background color
+              borderRadius: BorderRadius.circular(8.0), // Match the shape
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  note.title,
+                  style: TextStyle(
+                    fontSize: 16.0, // Set the title font size
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                SizedBox(height: 8.0),
+                Text(
+                  note.content,
+                  style: TextStyle(
+                    fontSize: 14.0, // Set the content font size
+                  ),
+                ),
+                SizedBox(height: 8.0),
+                Text(
+                  _dateFormatter.format(note.date),
+                  style: TextStyle(
+                    fontSize: 12.0, // Set the date font size
+                    color: Colors.grey, // Set the date text color
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _deleteNote(Note note) {
+    setState(() {
+      _notes.remove(note);
+    });
+    _updateCategoryCounts(); // Move this line out of setState
+  }
+
+  void _viewOrEditNote(Note note) async {
+    final updatedNote = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => NoteDetailScreen(
+            note: note,
+            category:
+                note.category), // Pass the category to the NoteDetailScreen
+      ),
+    );
+
+    if (updatedNote != null) {
+      int noteIndex = _notes.indexWhere((element) => element == note);
+      if (noteIndex != -1) {
+        setState(() {
+          _notes[noteIndex] = updatedNote;
+        });
+      }
+      _updateCategoryCounts();
+    }
+  }
+
+  void _addNote() {
+    setState(() {
+      String title = _noteTitleController.text;
+      String content = _noteContentController.text;
+      DateTime date = DateTime.now();
+
+      String selectedCategory =
+          categories.keys.toList()[_selectedCategoryIndex];
+      Note newNote = Note(
+        title: title,
+        content: content,
+        date: date,
+        category: selectedCategory, // Assign the selected category to the note
+      );
+      _notes.add(newNote);
+      _noteTitleController.clear();
+      _noteContentController.clear();
+      _updateCategoryCounts(); // Call _updateCategoryCounts to update the category counts
+    });
+  }
+
+  void _updateCategoryCounts() {
+    for (var category in categories.keys) {
+      int count = _notes.where((note) => note.category == category).length;
+      categories[category] = count;
+    }
+  }
+
+  Widget _buildCategories() {
+    List<Widget> categoryWidgets = [];
+
+    for (int index = 0; index < categories.length; index++) {
+      categoryWidgets.add(_buildCategoryCard(
+        index,
+        categories.keys.toList()[index],
+        categories.values.toList()[index],
+      ));
+    }
+
+    // Add a '+' icon for adding new notes
+    categoryWidgets.add(
+      GestureDetector(
+        onTap: () {
+          _addNote(); // Call the method to add a new note when the '+' icon is tapped.
+        },
+        child: Container(
+          margin: EdgeInsets.symmetric(vertical: 20.0, horizontal: 10.0),
+          height: 240.0,
+          width: 175.0,
+          decoration: BoxDecoration(
+            color:
+                Colors.green, // Change the color for the '+' icon as desired.
+            borderRadius: BorderRadius.circular(20.0),
+            boxShadow: [BoxShadow(color: Colors.transparent)],
+          ),
+          child: Center(
+            child: Icon(
+              Icons.add,
+              size: 80.0, // Adjust the size of the '+' icon as desired.
+              color:
+                  Colors.white, // Change the color of the '+' icon as desired.
+            ),
+          ),
+        ),
+      ),
+    );
+
+    return Container(
+      height: 280.0,
+      child: ListView(
+        physics: AlwaysScrollableScrollPhysics(), // Change the physics here
+        scrollDirection: Axis.horizontal,
+        children: categoryWidgets,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -97,14 +298,14 @@ class _NotesScreenState extends State<NotesScreen>
                   width: 50.0,
                   decoration: BoxDecoration(
                     image: DecorationImage(
-                      image: AssetImage('assets/images/user.png'),
+                      image: AssetImage('assets/images/app_icon.png'),
                     ),
                     borderRadius: BorderRadius.circular(10.0),
                   ),
                 ),
                 SizedBox(width: 20.0),
                 Text(
-                  'Nayisw',
+                  'Notes',
                   style: TextStyle(
                     fontSize: 28.0,
                     fontWeight: FontWeight.bold,
@@ -114,23 +315,7 @@ class _NotesScreenState extends State<NotesScreen>
             ),
           ),
           SizedBox(height: 40.0),
-          Container(
-            height: 280.0,
-            child: ListView.builder(
-              scrollDirection: Axis.horizontal,
-              itemCount: categories.length + 1,
-              itemBuilder: (BuildContext context, int index) {
-                if (index == 0) {
-                  return SizedBox(width: 20.0);
-                }
-                return _buildCategoryCard(
-                  index - 1,
-                  categories.keys.toList()[index - 1],
-                  categories.values.toList()[index - 1],
-                );
-              },
-            ),
-          ),
+          _buildCategories(), // Use the custom _buildCategories widget for categories
           Padding(
             padding: EdgeInsets.only(left: 15.0),
             child: TabBar(
@@ -173,116 +358,14 @@ class _NotesScreenState extends State<NotesScreen>
             ),
           ),
           SizedBox(height: 20.0),
-          Container(
-            margin: EdgeInsets.symmetric(horizontal: 30.0),
-            padding: EdgeInsets.all(30.0),
-            decoration: BoxDecoration(
-              color: Color(0xFFF5F7FB),
-              borderRadius: BorderRadius.circular(30.0),
-            ),
-            child: Column(
-              children: <Widget>[
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: <Widget>[
-                    Text(
-                      notes[0].title,
-                      style: TextStyle(
-                        color: Colors.black,
-                        fontSize: 18.0,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    Text(
-                      _timeFormatter.format(notes[0].date),
-                      style: TextStyle(
-                        color: Color(0xFFAFB4C6),
-                        fontSize: 18.0,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
-                ),
-                SizedBox(height: 15.0),
-                Text(
-                  notes[0].content,
-                  style: TextStyle(
-                    color: Colors.black,
-                    fontSize: 18.0,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: <Widget>[
-                    Text(
-                      _dateFormatter.format(notes[0].date),
-                      style: TextStyle(
-                        color: Color(0xFFAFB4C6),
-                        fontSize: 18.0,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    Container(
-                      height: 50.0,
-                      width: 50.0,
-                      decoration: BoxDecoration(
-                        color: Color(0xFF417BFB),
-                        borderRadius: BorderRadius.circular(15.0),
-                      ),
-                      child: Icon(
-                        Icons.location_on,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          SizedBox(height: 20.0),
-          Container(
-            margin: EdgeInsets.symmetric(horizontal: 30.0),
-            padding: EdgeInsets.all(30.0),
-            decoration: BoxDecoration(
-              color: Color(0xFFF5F7FB),
-              borderRadius: BorderRadius.circular(30.0),
-            ),
-            child: Column(
-              children: <Widget>[
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: <Widget>[
-                    Text(
-                      notes[1].title,
-                      style: TextStyle(
-                        color: Colors.black,
-                        fontSize: 18.0,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    Text(
-                      _timeFormatter.format(notes[1].date),
-                      style: TextStyle(
-                        color: Color(0xFFAFB4C6),
-                        fontSize: 18.0,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
-                ),
-                SizedBox(height: 15.0),
-                Text(
-                  notes[1].content,
-                  style: TextStyle(
-                    color: Colors.black,
-                    fontSize: 18.0,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
-            ),
+          // Display the list of notes
+          ListView.builder(
+            shrinkWrap: true,
+            physics: NeverScrollableScrollPhysics(),
+            itemCount: _notes.length,
+            itemBuilder: (context, index) {
+              return _buildNoteCard(_notes[index]);
+            },
           ),
         ],
       ),

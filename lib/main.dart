@@ -9,7 +9,7 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'Yuland Notes',
       debugShowCheckedModeBanner: false,
-      home: NotesScreen(),
+      home: NotesScreen(selectedCategory: 'Notes'), // Provide a selected category
     );
   }
 }
