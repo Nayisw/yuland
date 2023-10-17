@@ -24,7 +24,6 @@ git clone https://github.com/Nayisw/yuland.git
 
 > Open the folder in VS code
 ```
-
 Go to lib>main.dart
 ```
 
